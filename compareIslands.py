@@ -7,15 +7,18 @@ import matplotlib.pyplot as plt
 
 sessionOne = pd.read_csv("/Users/Abram/Documents/PCC/perceptionAnalyzer/sessionData/day1.csv").drop(columns="29")
 timeOne = pd.read_csv("/Users/Abram/Documents/PCC/perceptionAnalyzer/sessionTimes/time1.csv")
+sessionOne.name = 'sessionOne'
 
 sessionTwo = pd.read_csv("/Users/Abram/Documents/PCC/perceptionAnalyzer/sessionData/day2.csv").drop(columns="29")
 timeTwo = pd.read_csv("/Users/Abram/Documents/PCC/perceptionAnalyzer/sessionTimes/time2.csv")
+sessionTwo.name = 'sessionTwo'
 
 sessionThree = pd.read_csv("/Users/Abram/Documents/PCC/perceptionAnalyzer/sessionData/day3.csv").drop(columns="29")
 timeThree = pd.read_csv("/Users/Abram/Documents/PCC/perceptionAnalyzer/sessionTimes/time3.csv")
-
+sessionThree.name = 'sessionThree'
 
 sessionFour = pd.read_csv("/Users/Abram/Documents/PCC/perceptionAnalyzer/sessionData/day4.csv").drop(columns="29")
+sessionFour.name = 'sessionFour'
 timeFour = pd.read_csv("/Users/Abram/Documents/PCC/perceptionAnalyzer/sessionTimes/time4.csv")
 
 sessions = [sessionOne,sessionTwo,sessionThree,sessionFour]
@@ -62,6 +65,7 @@ def splitIslands(df, times):
     longestIsland = 0
     for index in times.index:
         if numpy.isnan(times.iloc[index]['start']) or numpy.isnan(times.iloc[index]['end']):
+            print("Missing data - skipping %s."%(times.iloc[index]['island']))
             continue
         island = average[int(times.iloc[index]['start']):int(times.iloc[index]['end'])]
         newIndices = dict(zip(list(island.index), list(range(len(island.index)))))
@@ -70,8 +74,6 @@ def splitIslands(df, times):
         if len(tempSeries) > longestIsland:
             longestIsland = len(tempSeries)
         listOfIslands.append(tempSeries)
-        #df2[times.iloc[index]['island']] = average[times.iloc[index]['start']:times.iloc[index]['end']].rename(index=newIndices))
-    #print(longestIsland)
     df2 = pd.DataFrame(index=range(longestIsland))
     for island in listOfIslands:
         df2[island.name] = island
@@ -82,21 +84,25 @@ def splitIslands(df, times):
 #process/clean raw data
 for i in range(len(sessions)):
     sessions[i] = splitIslands(sessions[i],times[i])
-#print(sessions[1][times[0].iloc[1]['island']])
 #build a df of just aotearoa from all sessions.
 
 
+
+#make a list of dataframes, each frame for each scene
 islandDfs = []
 for index in times[0].index:
     if index == 0: continue
     islandName = times[0].iloc[index]['island']
-    #print(type(islandName),"--> ", islandName)
     islandSeries = []
+    indexLength = 0
+    indexSeries = pd.Series()
     for i in range(len(sessions)):
-        #print(pd.Series(sessions[i][islandName]))
-        islandSeries.append(pd.Series(sessions[i][islandName]))
-    
-    islandDf = pd.DataFrame()
+        tempSeries = pd.Series(sessions[i][islandName])
+        islandSeries.append(tempSeries)    
+        if indexLength < len(tempSeries):
+            indexLength = len(tempSeries)
+            indexSeries = tempSeries
+    islandDf = pd.DataFrame(index=tempSeries.index)
     for i in range(len(islandSeries)):
         islandDf["rainbow%s"%(i+1)] = islandSeries[i]
     islandDfs.append(islandDf)
@@ -104,19 +110,25 @@ for index in times[0].index:
 
 
 #edit island data
-for island in islandDfs:
-
+for i in range(len(islandDfs)):
+    island = islandDfs[i]
     #make the dataframe only as long as the longest session
     islandCount = island.count()
     longestSession = 0
-    for i in range(len(islandCount)):
-        if islandCount[i] > longestSession:
-            longestSession = islandCount[i]
-    #print(longestSession)
-    print("before: ", island.index)
+    for j in range(len(islandCount)):
+        if islandCount[j] > longestSession:
+            longestSession = islandCount[j]
+
     island = island.drop(island.index[longestSession:])
-    print("after: ", island.index)
+    #print("after: ", island.index)
+    #resample the data 
+
     #give the dataframe a name   
     island.name = times[0].iloc[i+1]['island']
+    #print(type(island.name))
+    islandDfs[i] = island
 
-print(islandDfs)
+for island in islandDfs:
+
+
+    print(island.name, ":\n",island)

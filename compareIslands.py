@@ -122,13 +122,11 @@ def resizeIslandFrames(islandDfs):
                 longestCol = island[col].count()
         print(longestCol)
         #resample a col using the longestCol
-        island = island.resample("%sS"%(longestCol)).ffill()
+        island = island.interpolate(time="%s"%(longestCol))
         #give the dataframe a name   
         island.name = times[0].iloc[i+1]['island']
         islandDfs[i] = island
     return islandDfs
-
-
 
 #process/clean raw data
 for i in range(len(sessions)):

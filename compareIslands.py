@@ -81,54 +81,59 @@ def splitIslands(df, times):
     return df2
 
 
+#make a list of dataframes, each frame for each scene
+def islandDataframe(sessions,times):
+    islandDfs = []
+    for index in times[0].index:
+        if index == 0: continue
+        islandName = times[0].iloc[index]['island']
+        islandSeries = []
+        indexLength = 0
+        indexSeries = pd.Series()
+        for i in range(len(sessions)):
+            tempSeries = pd.Series(sessions[i][islandName])
+            islandSeries.append(tempSeries)    
+            if indexLength < len(tempSeries):
+                indexLength = len(tempSeries)
+                indexSeries = tempSeries
+        islandDf = pd.DataFrame(index=tempSeries.index)
+        for i in range(len(islandSeries)):
+            islandDf["rainbow%s"%(i+1)] = islandSeries[i]
+        islandDfs.append(islandDf)
+    return islandDfs
+
+
+def resizeIslandFrames(islandDfs):
+    for i in range(len(islandDfs)):
+        island = islandDfs[i]
+        #make the dataframe only as long as the longest session
+        islandCount = island.count()
+        longestSession = 0
+        for j in range(len(islandCount)):
+            if islandCount[j] > longestSession:
+                longestSession = islandCount[j]
+
+        island = island.drop(island.index[longestSession:])
+    #resample the data 
+        #get longest col
+        longestCol = 0
+        for col in island.columns:
+            if island[col].count() > longestCol: 
+                longestCol = island[col].count()
+        print(longestCol)
+        #resample a col using the longestCol
+        island = island.resample("%sS"%(longestCol)).ffill()
+        #give the dataframe a name   
+        island.name = times[0].iloc[i+1]['island']
+        islandDfs[i] = island
+    return islandDfs
+
+
+
 #process/clean raw data
 for i in range(len(sessions)):
     sessions[i] = splitIslands(sessions[i],times[i])
-#build a df of just aotearoa from all sessions.
-
-
-
-#make a list of dataframes, each frame for each scene
-islandDfs = []
-for index in times[0].index:
-    if index == 0: continue
-    islandName = times[0].iloc[index]['island']
-    islandSeries = []
-    indexLength = 0
-    indexSeries = pd.Series()
-    for i in range(len(sessions)):
-        tempSeries = pd.Series(sessions[i][islandName])
-        islandSeries.append(tempSeries)    
-        if indexLength < len(tempSeries):
-            indexLength = len(tempSeries)
-            indexSeries = tempSeries
-    islandDf = pd.DataFrame(index=tempSeries.index)
-    for i in range(len(islandSeries)):
-        islandDf["rainbow%s"%(i+1)] = islandSeries[i]
-    islandDfs.append(islandDf)
-
-
-
-#edit island data
-for i in range(len(islandDfs)):
-    island = islandDfs[i]
-    #make the dataframe only as long as the longest session
-    islandCount = island.count()
-    longestSession = 0
-    for j in range(len(islandCount)):
-        if islandCount[j] > longestSession:
-            longestSession = islandCount[j]
-
-    island = island.drop(island.index[longestSession:])
-    #print("after: ", island.index)
-    #resample the data 
-
-    #give the dataframe a name   
-    island.name = times[0].iloc[i+1]['island']
-    #print(type(island.name))
-    islandDfs[i] = island
-
+islandDfs = islandDataframe(sessions,times)
+islandDfs = resizeIslandFrames(islandDfs)
 for island in islandDfs:
-
-
     print(island.name, ":\n",island)

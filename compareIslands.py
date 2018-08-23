@@ -105,24 +105,38 @@ def islandDataframe(sessions,times):
 
 def resizeIslandFrames(islandDfs):
     for i in range(len(islandDfs)):
+        if i == 1: break
         island = islandDfs[i]
         #make the dataframe only as long as the longest session
-        islandCount = island.count()
-        longestSession = 0
-        for j in range(len(islandCount)):
-            if islandCount[j] > longestSession:
-                longestSession = islandCount[j]
+        #islandCount = island.count()
+        #longestSession = 0
+        #for j in range(len(islandCount)):
+        #    if islandCount[j] > longestSession:
+        #        longestSession = islandCount[j]
 
-        island = island.drop(island.index[longestSession:])
+        #island = island.drop(island.index[longestSession:])
     #resample the data 
-        #get longest col
-        longestCol = 0
+        #get shortest col
+        shortestCol = 100000
         for col in island.columns:
-            if island[col].count() > longestCol: 
-                longestCol = island[col].count()
-        print(longestCol)
-        #resample a col using the longestCol
-        island = island.interpolate(time="%s"%(longestCol))
+            if island[col].count() < shortestCol: 
+                shortestCol = island[col].count()
+        #resample a col using the shortestCol
+        for col in island.columns:
+            diff = island[col].count()-shortestCol
+            if diff != 0:
+                nth = int(island[col].count()/diff)
+                #print(len(island[col]))
+                for increment in range(0,len(island[col]),nth):
+                    if not (increment >= len(island[col])-1):
+                        print(increment, ":",len(island[col]))
+                        #avg = (island[col][increment]+island[col][increment-1]+island[col][increment+1])/3
+                        #print(avg)
+                #print("%s = %s - %s with a nth of %s"%(diff,island[col].count(),shortestCol,nth))
+                    
+
+
+        #island = island.interpolate(time="%s"%(longestCol))
         #give the dataframe a name   
         island.name = times[0].iloc[i+1]['island']
         islandDfs[i] = island
@@ -133,5 +147,13 @@ for i in range(len(sessions)):
     sessions[i] = splitIslands(sessions[i],times[i])
 islandDfs = islandDataframe(sessions,times)
 islandDfs = resizeIslandFrames(islandDfs)
-for island in islandDfs:
-    print(island.name, ":\n",island)
+#for island in islandDfs:
+    #island.plot()
+    #print(island.name, ":\n",island)
+
+#plt.show()
+#myList = []
+##for i in range(10):
+#    myList.append(0)
+#for i in range(0,len(myList),3):
+#    print(i)

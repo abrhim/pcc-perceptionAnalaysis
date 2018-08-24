@@ -48,7 +48,10 @@ def removeErrorProneCols(df):
 
 def getAvgs(df):
     avgData = pd.DataFrame()
-    columns = df.columns[1:]
+    colList = list(df.columns)
+    if 'time' in colList: 
+        df = df.drop(columns='time')
+    columns = df.columns
     for col in columns:
         columnName = "MovingAvg-"+col[6:8] if len(col) == 8 else "MovingAvg-"+col[6]
         colAvgs = df[col].rolling(10,min_periods=0).mean()
@@ -59,8 +62,7 @@ def getAvgs(df):
     return pd.Series(avgDataAvgs)
 
 def splitIslands(df, times):
-    average = getAvgs(removeErrorProneCols(cleanUpErrors(changeIndexToDateTime(df))))
-    #print(average)
+    average = getAvgs(removeErrorProneCols(cleanUpErrors(df)))
     listOfIslands = []
     longestIsland = 0
     for index in times.index:
@@ -77,7 +79,6 @@ def splitIslands(df, times):
     df2 = pd.DataFrame(index=range(longestIsland))
     for island in listOfIslands:
         df2[island.name] = island
-    df2.index=pd.to_datetime(df2.index,unit='s')
     return df2
 
 
@@ -103,57 +104,86 @@ def islandDataframe(sessions,times):
     return islandDfs
 
 
+def compressColumns(df):
+    #establish shortest column and grab its name
+    shortestCol = 100000
+    shortestColName = ""
+    for col in df.columns:
+        if df[col].count() < shortestCol: 
+            shortestCol = df[col].count()
+            shortestColName = col
+
+
+    #remove values and avg their neighbors against it to preserve movement. 
+    for col in df.columns:
+        diff = df[col].count()-shortestCol
+        if diff != 0:
+
+            #generate a list to get the incrementing values
+            nthF = df[col].count()/diff
+            nth = int(nthF)
+            colSeries = df[col]
+            nthCounter = 0
+            nthList = []
+            
+            #calculate avgs and delete rows
+            for i in range(len(colSeries)):
+
+                #count according to the incrementor, and round down. Add it to the List
+                #  - if i is in List, then perform our functions on it.
+                nthCounter += nthF
+                nthList.append(round(nthCounter))
+                if i in nthList and i < len(df[shortestColName]):
+                    if i != 0 and i != len(df[shortestColName])-1:
+                        avgLower = (colSeries[i]+colSeries[i-1])/2
+                        avgUpper =(colSeries[i]+colSeries[i+1])/2
+                        colSeries.loc[i-1]= avgLower
+                        colSeries.loc[i+1] = avgUpper
+                        colSeries = colSeries.drop(index=i)
+                    elif i == 0:
+                        avg=(colSeries[i]+colSeries[i+1])/2
+                        colSeries.loc[i+1] = avg
+                        colSeries = colSeries.drop(index=i)
+                    else:
+                        avg=(colSeries[i]+colSeries[i-1])/2
+                        colSeries.loc[i-1]= avg
+                        colSeries = colSeries.drop(index=i)
+            if abs(colSeries.count() - df[shortestColName].count()) == 1:
+                lastIndex = colSeries.last_valid_index()
+                avg = (colSeries.loc[lastIndex-1] + colSeries.loc[lastIndex])/2
+                colSeries.loc[lastIndex-1] = avg
+                colSeries = colSeries.drop(index=lastIndex)
+
+            #reindex the column giving it the effect as if we removed the values and smashed it to match the shortest column
+            oldIndex = list(colSeries.index)
+            newIndex = list(df[shortestColName].index)
+            indexDict = dict(zip(oldIndex,newIndex))
+
+            #print(colSeries.count())
+            colSeries = colSeries.rename(index=indexDict)
+            df[col] = colSeries
+    return df
+
+
 def resizeIslandFrames(islandDfs):
     for i in range(len(islandDfs)):
-        if i == 1: break
-        island = islandDfs[i]
-        #make the dataframe only as long as the longest session
-        #islandCount = island.count()
-        #longestSession = 0
-        #for j in range(len(islandCount)):
-        #    if islandCount[j] > longestSession:
-        #        longestSession = islandCount[j]
+        #print(islandDfs[i])
+        islandDfs[i].name = times[0].iloc[i+1]['island']
+        islandDfs[i] = compressColumns(islandDfs[i])
+        #print(islandDfs[i])
 
-        #island = island.drop(island.index[longestSession:])
-    #resample the data 
-        #get shortest col
-        shortestCol = 100000
-        for col in island.columns:
-            if island[col].count() < shortestCol: 
-                shortestCol = island[col].count()
-        #resample a col using the shortestCol
-        for col in island.columns:
-            diff = island[col].count()-shortestCol
-            if diff != 0:
-                nth = int(island[col].count()/diff)
-                #print(len(island[col]))
-                for increment in range(0,len(island[col]),nth):
-                    if not (increment >= len(island[col])-1):
-                        print(increment, ":",len(island[col]))
-                        #avg = (island[col][increment]+island[col][increment-1]+island[col][increment+1])/3
-                        #print(avg)
-                #print("%s = %s - %s with a nth of %s"%(diff,island[col].count(),shortestCol,nth))
-                    
-
-
-        #island = island.interpolate(time="%s"%(longestCol))
-        #give the dataframe a name   
-        island.name = times[0].iloc[i+1]['island']
-        islandDfs[i] = island
     return islandDfs
 
 #process/clean raw data
 for i in range(len(sessions)):
     sessions[i] = splitIslands(sessions[i],times[i])
 islandDfs = islandDataframe(sessions,times)
-islandDfs = resizeIslandFrames(islandDfs)
-#for island in islandDfs:
-    #island.plot()
-    #print(island.name, ":\n",island)
+for island in islandDfs:
+    island.plot()
 
-#plt.show()
-#myList = []
-##for i in range(10):
-#    myList.append(0)
-#for i in range(0,len(myList),3):
-#    print(i)
+islandDfs = resizeIslandFrames(islandDfs)
+for island in islandDfs:
+    print(island.name)
+    island.to_csv("/Users/abram/Documents/PCC/perceptionAnalyzer/islandData/%s.csv"%(island.name))
+
+    

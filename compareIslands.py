@@ -168,22 +168,49 @@ def compressColumns(df):
 def resizeIslandFrames(islandDfs):
     for i in range(len(islandDfs)):
         #print(islandDfs[i])
-        islandDfs[i].name = times[0].iloc[i+1]['island']
         islandDfs[i] = compressColumns(islandDfs[i])
-        #print(islandDfs[i])
+        islandDfs[i]=islandDfs[i].drop(index=islandDfs[i].index[islandDfs[i].count()[0]])
+        islandDfs[i].name = times[0].iloc[i+1]['island']
+
 
     return islandDfs
+
+
+def delsColumn(col,df):
+    col3 = df.columns[2]
+    col4 = df.columns[3]
+    return df[col]-(df[col]-((df[col3]+df[col4])/2))
+def getMean(col1, col2):
+    return (col1+col2)/2
+
+def bendSession(df):
+    col1 = df.columns[0]
+    col2 = df.columns[1]
+    col3 = df.columns[2]
+    col4 = df.columns[3]
+    #tempCol = pd.Series()
+    col1a = delsColumn(col1,df)
+    col2a = delsColumn(col2,df)
+    meanCol = getMean(col1a,col2a)
+    maxVal = meanCol.max()
+    minVal = meanCol.min()
+    meanOverMax = meanCol/maxVal
+    df[col1] = df[col1]*meanOverMax
+    df[col2] = df[col2]*meanOverMax
+    return df
+
 
 #process/clean raw data
 for i in range(len(sessions)):
     sessions[i] = splitIslands(sessions[i],times[i])
 islandDfs = islandDataframe(sessions,times)
-for island in islandDfs:
-    island.plot()
 
 islandDfs = resizeIslandFrames(islandDfs)
 for island in islandDfs:
+    island = bendSession(island)
+    island.plot()
     print(island.name)
     island.to_csv("/Users/abram/Documents/PCC/perceptionAnalyzer/islandData/%s.csv"%(island.name))
+plt.show()
 
     
